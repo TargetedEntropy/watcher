@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Video Watcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0f0f0f;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            max-width: 600px;
+        }
+
+        #urlInput {
+            flex: 1;
+            padding: 10px 15px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        #urlInput:focus {
+            outline: none;
+            border-color: #ff0000;
+        }
+
+        #addVideoBtn {
+            padding: 10px 20px;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #addVideoBtn:hover {
+            background: #cc0000;
+        }
+
+        #addVideoBtn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .video-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            background: #000;
+            padding: 2px;
+        }
+
+        .video-slot {
+            position: relative;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .video-slot iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .empty-slot {
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .video-slot:hover .remove-btn {
+            opacity: 1;
+        }
+
+        .remove-btn:hover {
+            background: #ff0000;
+        }
+
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-indicator.connected {
+            background: #00ff00;
+        }
+
+        .status-indicator.disconnected {
+            background: #ff0000;
+        }
+
+        @media (max-width: 768px) {
+            .video-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(4, 250px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Multi-Video Watcher</h1>
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="urlInput" 
+                placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=...)"
+            >
+            <button id="addVideoBtn">Add Video</button>
+        </div>
+    </div>
+
+    <div class="video-grid" id="videoGrid">
+        <div class="video-slot" data-slot="0">
+            <div class="empty-slot">Empty Slot 1</div>
+        </div>
+        <div class="video-slot" data-slot="1">
+            <div class="empty-slot">Empty Slot 2</div>
+        </div>
+        <div class="video-slot" data-slot="2">
+            <div class="empty-slot">Empty Slot 3</div>
+        </div>
+        <div class="video-slot" data-slot="3">
+            <div class="empty-slot">Empty Slot 4</div>
+        </div>
+    </div>
+
+    <div class="status">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <span id="statusText">Connecting...</span>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
