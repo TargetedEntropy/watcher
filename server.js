@@ -17,6 +17,10 @@ const PORT = process.env.PORT || 3000;
 // Store current video state
 let videoSlots = [null, null, null, null];
 
+// Store playlist history (max 50 items)
+let playlistHistory = [];
+const MAX_HISTORY_SIZE = 50;
+
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 
@@ -24,15 +28,41 @@ app.use(express.static(path.join(__dirname)));
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
     
-    // Send current video state to new client
+    // Send current video state and history to new client
     socket.emit('initial-state', videoSlots);
+    socket.emit('playlist-history', playlistHistory);
     
     // Handle video addition
     socket.on('add-video', (data) => {
-        const { slotIndex, videoId } = data;
+        const { slotIndex, videoId, title, replaceFromHistory } = data;
         
-        if (slotIndex >= 0 && slotIndex < 4) {
+        if (slotIndex >= 0 && slotIndex < 4 && videoId) {
             videoSlots[slotIndex] = videoId;
+            
+            // Add to history if it's a new video (not from history)
+            if (!replaceFromHistory) {
+                const historyItem = {
+                    videoId,
+                    title: title || videoId,
+                    timestamp: new Date().toISOString(),
+                    id: Date.now() + Math.random() // Simple unique ID
+                };
+                
+                // Check if video already exists in history
+                const existingIndex = playlistHistory.findIndex(item => item.videoId === videoId);
+                if (existingIndex === -1) {
+                    // Add to beginning of history
+                    playlistHistory.unshift(historyItem);
+                    
+                    // Limit history size
+                    if (playlistHistory.length > MAX_HISTORY_SIZE) {
+                        playlistHistory = playlistHistory.slice(0, MAX_HISTORY_SIZE);
+                    }
+                    
+                    // Broadcast updated history to all clients
+                    io.emit('history-updated', playlistHistory);
+                }
+            }
             
             // Broadcast to all clients including sender
             io.emit('video-updated', {
