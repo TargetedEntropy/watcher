@@ -243,8 +243,10 @@
             padding: 10px;
             background: #2a2a2a;
             border-radius: 4px;
-            cursor: pointer;
+            cursor: move;
             transition: all 0.2s;
+            user-select: none;
+            -webkit-user-drag: element;
         }
 
         .history-item:hover {
@@ -286,8 +288,13 @@
         }
 
         .video-slot.drag-over {
-            outline: 2px dashed #ff0000;
-            outline-offset: -2px;
+            outline: 3px dashed #ff0000;
+            outline-offset: -3px;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .video-slot.drag-over iframe {
+            opacity: 0.5;
         }
 
         @media (max-width: 768px) {
@@ -352,7 +359,8 @@
             </div>
             <div class="playlist-content">
                 <div class="playlist-instructions">
-                    Click on any video to add it to an empty slot, or drag it onto a specific slot to replace.
+                    <strong>Click</strong> to add to empty slot<br>
+                    <strong>Drag & Drop</strong> onto any slot to replace the current video
                 </div>
                 <div class="playlist-list" id="playlistHistory">
                     <!-- History items will be added here -->

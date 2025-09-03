@@ -43,11 +43,19 @@ function updateVideoSlot(slotIndex, videoId) {
     const slot = document.querySelector(`.video-slot[data-slot="${slotIndex}"]`);
     if (!slot) return;
     
-    // Clear existing content
+    // Stop any existing video by removing iframe
+    const existingIframe = slot.querySelector('iframe');
+    if (existingIframe) {
+        // Stop the video by removing src first
+        existingIframe.src = '';
+        existingIframe.remove();
+    }
+    
+    // Clear all content
     slot.innerHTML = '';
     
     if (videoId) {
-        // Add video
+        // Add new video
         const iframe = createYouTubeEmbed(videoId);
         slot.appendChild(iframe);
         
@@ -59,6 +67,7 @@ function updateVideoSlot(slotIndex, videoId) {
         slot.appendChild(removeBtn);
         
         currentVideos[slotIndex] = videoId;
+        
     } else {
         // Show empty slot
         const emptyDiv = document.createElement('div');
@@ -119,9 +128,17 @@ async function addVideo(videoId = null, targetSlot = null, fromHistory = false) 
         }
     }
     
+    // If no target slot specified, find an empty one
     const slotIndex = targetSlot !== null ? targetSlot : findEmptySlot();
+    
+    // Only show alert if trying to add without a specific target and all slots are full
+    if (slotIndex === -1 && targetSlot === null) {
+        alert('All slots are full. Please remove a video first or drag onto a specific slot to replace.');
+        return;
+    }
+    
+    // Allow replacement if a specific slot is targeted
     if (slotIndex === -1) {
-        alert('All slots are full. Please remove a video first.');
         return;
     }
     
@@ -230,20 +247,37 @@ function renderPlaylistHistory() {
         historyItem.appendChild(thumbnail);
         historyItem.appendChild(info);
         
-        // Click to add to empty slot
-        historyItem.addEventListener('click', () => {
-            addVideo(item.videoId, null, true);
+        // Click to add to empty slot (but not when dragging)
+        let isDragging = false;
+        historyItem.addEventListener('mousedown', () => {
+            isDragging = false;
+        });
+        
+        historyItem.addEventListener('click', (e) => {
+            if (!isDragging) {
+                addVideo(item.videoId, null, true);
+            }
         });
         
         // Drag and drop
         historyItem.addEventListener('dragstart', (e) => {
+            isDragging = true;
             e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('videoId', item.videoId);
-            e.dataTransfer.setData('fromHistory', 'true');
+            e.dataTransfer.setData('text/plain', item.videoId); // Use text/plain for better compatibility
+            e.dataTransfer.setData('application/x-video-id', item.videoId);
+            e.dataTransfer.setData('application/x-from-history', 'true');
             historyItem.classList.add('dragging');
+            
+            // Create a drag image (optional, for better visual feedback)
+            const dragImage = historyItem.cloneNode(true);
+            dragImage.style.opacity = '0.5';
+            document.body.appendChild(dragImage);
+            e.dataTransfer.setDragImage(dragImage, e.offsetX, e.offsetY);
+            setTimeout(() => document.body.removeChild(dragImage), 0);
         });
         
-        historyItem.addEventListener('dragend', () => {
+        historyItem.addEventListener('dragend', (e) => {
+            isDragging = false;
             historyItem.classList.remove('dragging');
         });
         
@@ -266,10 +300,15 @@ function setupSlotDragAndDrop() {
         
         slot.addEventListener('drop', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             slot.classList.remove('drag-over');
             
-            const videoId = e.dataTransfer.getData('videoId');
-            const fromHistory = e.dataTransfer.getData('fromHistory') === 'true';
+            // Try multiple data types for compatibility
+            const videoId = e.dataTransfer.getData('text/plain') || 
+                           e.dataTransfer.getData('application/x-video-id') || 
+                           e.dataTransfer.getData('videoId');
+            const fromHistory = e.dataTransfer.getData('application/x-from-history') === 'true' || 
+                               e.dataTransfer.getData('fromHistory') === 'true';
             const slotIndex = parseInt(slot.dataset.slot);
             
             if (videoId && slotIndex >= 0) {
