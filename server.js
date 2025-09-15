@@ -21,16 +21,25 @@ let videoSlots = [null, null, null, null];
 let playlistHistory = [];
 const MAX_HISTORY_SIZE = 50;
 
+// Track connected users count
+let connectedUsers = 0;
+
 // Serve static files
 app.use(express.static(path.join(__dirname)));
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
-    
+
+    // Increment connected users count
+    connectedUsers++;
+
     // Send current video state and history to new client
     socket.emit('initial-state', videoSlots);
     socket.emit('playlist-history', playlistHistory);
+
+    // Send user count to all clients
+    io.emit('user-count', connectedUsers);
     
     // Handle video addition
     socket.on('add-video', (data) => {
@@ -88,6 +97,12 @@ io.on('connection', (socket) => {
     
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+
+        // Decrement connected users count
+        connectedUsers--;
+
+        // Send updated user count to all remaining clients
+        io.emit('user-count', connectedUsers);
     });
 });
 

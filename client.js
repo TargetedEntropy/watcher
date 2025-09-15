@@ -7,6 +7,7 @@ const addVideoBtn = document.getElementById('addVideoBtn');
 const videoGrid = document.getElementById('videoGrid');
 const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
+const userCountElement = document.getElementById('userCount');
 
 // Current video state
 let currentVideos = [null, null, null, null];
@@ -342,6 +343,13 @@ socket.on('playlist-history', (history) => {
 socket.on('history-updated', (history) => {
     playlistHistory = history;
     renderPlaylistHistory();
+});
+
+// Handle user count updates
+socket.on('user-count', (count) => {
+    if (userCountElement) {
+        userCountElement.textContent = `(${count} ${count === 1 ? 'user' : 'users'} connected)`;
+    }
 });
 
 // Initialize UI components
