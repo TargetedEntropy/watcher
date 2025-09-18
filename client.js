@@ -13,6 +13,7 @@ const userCountElement = document.getElementById('userCount');
 let currentVideos = [null, null, null, null];
 let playlistHistory = [];
 let isPanelExpanded = true;
+let currentRoom = 'default';
 
 // Extract YouTube video ID from various URL formats
 function extractVideoId(url) {
@@ -172,6 +173,11 @@ socket.on('connect', () => {
     statusIndicator.classList.add('connected');
     statusIndicator.classList.remove('disconnected');
     statusText.textContent = 'Connected';
+
+    // Join room from URL or default
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room') || 'default';
+    joinRoom(roomId);
 });
 
 socket.on('disconnect', () => {
@@ -352,10 +358,139 @@ socket.on('user-count', (count) => {
     }
 });
 
+// Room management functions
+function joinRoom(roomId) {
+    socket.emit('join-room', roomId, (response) => {
+        if (response.success) {
+            currentRoom = response.roomId;
+            updateRoomDisplay();
+        }
+    });
+}
+
+function createRoom() {
+    socket.emit('create-room', (response) => {
+        if (response.success) {
+            currentRoom = response.roomId;
+            updateRoomDisplay();
+            updateURL();
+        }
+    });
+}
+
+function updateRoomDisplay() {
+    document.getElementById('currentRoom').textContent = currentRoom;
+    document.getElementById('modalCurrentRoom').textContent = currentRoom;
+}
+
+function updateURL() {
+    if (currentRoom !== 'default') {
+        const url = new URL(window.location);
+        url.searchParams.set('room', currentRoom);
+        window.history.replaceState({}, '', url);
+    } else {
+        const url = new URL(window.location);
+        url.searchParams.delete('room');
+        window.history.replaceState({}, '', url);
+    }
+}
+
+function shareRoom() {
+    if (currentRoom === 'default') {
+        alert('Cannot share the default room');
+        return;
+    }
+
+    const shareUrl = new URL(window.location.origin);
+    shareUrl.searchParams.set('room', currentRoom);
+
+    navigator.clipboard.writeText(shareUrl.toString()).then(() => {
+        alert('Room link copied to clipboard!');
+    }).catch(() => {
+        prompt('Copy this link to share the room:', shareUrl.toString());
+    });
+}
+
+// Socket events for room management
+socket.on('room-created', (data) => {
+    currentRoom = data.roomId;
+    updateRoomDisplay();
+    updateURL();
+});
+
+socket.on('room-joined', (data) => {
+    currentRoom = data.roomId;
+    updateRoomDisplay();
+    updateURL();
+});
+
+// Setup modal functionality
+function setupModal() {
+    const modal = document.getElementById('roomModal');
+    const roomMenuBtn = document.getElementById('roomMenuBtn');
+    const closeModal = document.getElementById('closeModal');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const joinRoomInput = document.getElementById('joinRoomInput');
+    const shareRoomBtn = document.getElementById('shareRoomBtn');
+
+    // Open modal
+    roomMenuBtn?.addEventListener('click', () => {
+        modal.style.display = 'block';
+        updateRoomDisplay();
+    });
+
+    // Close modal
+    closeModal?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Create room
+    createRoomBtn?.addEventListener('click', () => {
+        createRoom();
+        modal.style.display = 'none';
+    });
+
+    // Join room
+    joinRoomBtn?.addEventListener('click', () => {
+        const roomId = joinRoomInput.value.trim().toUpperCase();
+        if (roomId) {
+            joinRoom(roomId);
+            joinRoomInput.value = '';
+            modal.style.display = 'none';
+        } else {
+            alert('Please enter a room code');
+        }
+    });
+
+    // Join room on Enter
+    joinRoomInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            joinRoomBtn.click();
+        }
+    });
+
+    // Share room
+    shareRoomBtn?.addEventListener('click', shareRoom);
+
+    // Auto-uppercase room input
+    joinRoomInput?.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+    });
+}
+
 // Initialize UI components
 document.addEventListener('DOMContentLoaded', () => {
     setupSlotDragAndDrop();
     setupPanelToggle();
+    setupModal();
 });
 
 // Initial connection status

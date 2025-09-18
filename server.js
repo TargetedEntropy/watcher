@@ -14,15 +14,33 @@ const io = socketIO(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Store current video state
-let videoSlots = [null, null, null, null];
-
-// Store playlist history (max 50 items)
-let playlistHistory = [];
+// Store rooms data - each room has its own state
+let rooms = new Map();
 const MAX_HISTORY_SIZE = 50;
 
-// Track connected users count
-let connectedUsers = 0;
+// Default room configuration
+function createRoom(roomId) {
+    return {
+        id: roomId,
+        videoSlots: [null, null, null, null],
+        playlistHistory: [],
+        connectedUsers: 0,
+        createdAt: new Date().toISOString()
+    };
+}
+
+// Get or create room
+function getRoom(roomId) {
+    if (!rooms.has(roomId)) {
+        rooms.set(roomId, createRoom(roomId));
+    }
+    return rooms.get(roomId);
+}
+
+// Generate random room ID
+function generateRoomId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
@@ -31,23 +49,66 @@ app.use(express.static(path.join(__dirname)));
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
-    // Increment connected users count
-    connectedUsers++;
+    // Handle room creation
+    socket.on('create-room', (callback) => {
+        const roomId = generateRoomId();
+        const room = getRoom(roomId);
+        socket.join(roomId);
+        socket.roomId = roomId;
+        room.connectedUsers++;
 
-    // Send current video state and history to new client
-    socket.emit('initial-state', videoSlots);
-    socket.emit('playlist-history', playlistHistory);
+        console.log(`Room created: ${roomId}`);
 
-    // Send user count to all clients
-    io.emit('user-count', connectedUsers);
+        // Send room info and initial state
+        socket.emit('room-created', { roomId });
+        socket.emit('initial-state', room.videoSlots);
+        socket.emit('playlist-history', room.playlistHistory);
+        io.to(roomId).emit('user-count', room.connectedUsers);
+
+        if (callback) callback({ success: true, roomId });
+    });
+
+    // Handle room joining
+    socket.on('join-room', (roomId, callback) => {
+        if (!roomId) roomId = 'default';
+
+        const room = getRoom(roomId);
+        socket.join(roomId);
+        socket.roomId = roomId;
+        room.connectedUsers++;
+
+        console.log(`Client ${socket.id} joined room: ${roomId}`);
+
+        // Send room info and initial state
+        socket.emit('room-joined', { roomId });
+        socket.emit('initial-state', room.videoSlots);
+        socket.emit('playlist-history', room.playlistHistory);
+        io.to(roomId).emit('user-count', room.connectedUsers);
+
+        if (callback) callback({ success: true, roomId });
+    });
+
+    // Auto-join default room if no room specified
+    if (!socket.roomId) {
+        const defaultRoom = getRoom('default');
+        socket.join('default');
+        socket.roomId = 'default';
+        defaultRoom.connectedUsers++;
+
+        socket.emit('room-joined', { roomId: 'default' });
+        socket.emit('initial-state', defaultRoom.videoSlots);
+        socket.emit('playlist-history', defaultRoom.playlistHistory);
+        io.to('default').emit('user-count', defaultRoom.connectedUsers);
+    }
     
     // Handle video addition
     socket.on('add-video', (data) => {
         const { slotIndex, videoId, title, replaceFromHistory } = data;
-        
-        if (slotIndex >= 0 && slotIndex < 4 && videoId) {
-            videoSlots[slotIndex] = videoId;
-            
+        const room = getRoom(socket.roomId);
+
+        if (slotIndex >= 0 && slotIndex < 4 && videoId && room) {
+            room.videoSlots[slotIndex] = videoId;
+
             // Add to history if it's a new video (not from history)
             if (!replaceFromHistory) {
                 const historyItem = {
@@ -56,53 +117,63 @@ io.on('connection', (socket) => {
                     timestamp: new Date().toISOString(),
                     id: Date.now() + Math.random() // Simple unique ID
                 };
-                
+
                 // Check if video already exists in history
-                const existingIndex = playlistHistory.findIndex(item => item.videoId === videoId);
+                const existingIndex = room.playlistHistory.findIndex(item => item.videoId === videoId);
                 if (existingIndex === -1) {
                     // Add to beginning of history
-                    playlistHistory.unshift(historyItem);
-                    
+                    room.playlistHistory.unshift(historyItem);
+
                     // Limit history size
-                    if (playlistHistory.length > MAX_HISTORY_SIZE) {
-                        playlistHistory = playlistHistory.slice(0, MAX_HISTORY_SIZE);
+                    if (room.playlistHistory.length > MAX_HISTORY_SIZE) {
+                        room.playlistHistory = room.playlistHistory.slice(0, MAX_HISTORY_SIZE);
                     }
-                    
-                    // Broadcast updated history to all clients
-                    io.emit('history-updated', playlistHistory);
+
+                    // Broadcast updated history to room clients
+                    io.to(socket.roomId).emit('history-updated', room.playlistHistory);
                 }
             }
-            
-            // Broadcast to all clients including sender
-            io.emit('video-updated', {
+
+            // Broadcast to room clients including sender
+            io.to(socket.roomId).emit('video-updated', {
                 slotIndex,
                 videoId
             });
-            
-            console.log(`Video added to slot ${slotIndex}: ${videoId}`);
+
+            console.log(`Video added to slot ${slotIndex} in room ${socket.roomId}: ${videoId}`);
         }
     });
     
     // Handle video removal
     socket.on('remove-video', (slotIndex) => {
-        if (slotIndex >= 0 && slotIndex < 4) {
-            videoSlots[slotIndex] = null;
-            
-            // Broadcast to all clients including sender
-            io.emit('video-removed', slotIndex);
-            
-            console.log(`Video removed from slot ${slotIndex}`);
+        const room = getRoom(socket.roomId);
+
+        if (slotIndex >= 0 && slotIndex < 4 && room) {
+            room.videoSlots[slotIndex] = null;
+
+            // Broadcast to room clients including sender
+            io.to(socket.roomId).emit('video-removed', slotIndex);
+
+            console.log(`Video removed from slot ${slotIndex} in room ${socket.roomId}`);
         }
     });
-    
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
 
-        // Decrement connected users count
-        connectedUsers--;
+        if (socket.roomId) {
+            const room = getRoom(socket.roomId);
+            room.connectedUsers--;
 
-        // Send updated user count to all remaining clients
-        io.emit('user-count', connectedUsers);
+            // Send updated user count to remaining room clients
+            io.to(socket.roomId).emit('user-count', room.connectedUsers);
+
+            // Clean up empty rooms (except default)
+            if (room.connectedUsers === 0 && socket.roomId !== 'default') {
+                rooms.delete(socket.roomId);
+                console.log(`Room ${socket.roomId} deleted (empty)`);
+            }
+        }
     });
 });
 

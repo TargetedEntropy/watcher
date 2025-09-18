@@ -26,10 +26,44 @@
             border-bottom: 1px solid #333;
         }
 
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
         h1 {
             font-size: 1.5rem;
-            margin-bottom: 15px;
+            margin: 0;
             color: #fff;
+        }
+
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        #currentRoom {
+            color: #ff0000;
+            font-weight: 500;
+        }
+
+        .room-menu-btn {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 5px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .room-menu-btn:hover {
+            background: #444;
         }
 
         .input-container {
@@ -297,6 +331,140 @@
             opacity: 0.5;
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-content {
+            background-color: #1a1a1a;
+            margin: 10% auto;
+            padding: 0;
+            border: 1px solid #333;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            color: #fff;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .room-section {
+            margin-bottom: 30px;
+        }
+
+        .room-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .room-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.1rem;
+            color: #ff0000;
+        }
+
+        .room-action-btn {
+            background: #ff0000;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .room-action-btn:hover {
+            background: #cc0000;
+        }
+
+        .room-action-btn.secondary {
+            background: #333;
+            border: 1px solid #555;
+        }
+
+        .room-action-btn.secondary:hover {
+            background: #444;
+        }
+
+        .room-help {
+            margin: 10px 0 0 0;
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .join-room-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #joinRoomInput {
+            flex: 1;
+            padding: 10px 15px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        #joinRoomInput:focus {
+            outline: none;
+            border-color: #ff0000;
+        }
+
+        .current-room-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .current-room-info p {
+            margin: 0;
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 flex-direction: column;
@@ -323,14 +491,54 @@
 </head>
 <body>
     <div class="header">
-        <h1>Watcher <span id="userCount" style="font-size: 0.8em; color: #999; margin-left: 10px;"></span></h1>
+        <div class="header-top">
+            <h1>Watcher <span id="userCount" style="font-size: 0.8em; color: #999; margin-left: 10px;"></span></h1>
+            <div class="room-info">
+                <span id="roomDisplay">Room: <span id="currentRoom">default</span></span>
+                <button id="roomMenuBtn" class="room-menu-btn">⚙️</button>
+            </div>
+        </div>
         <div class="input-container">
-            <input 
-                type="text" 
-                id="urlInput" 
+            <input
+                type="text"
+                id="urlInput"
                 placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=...)"
             >
             <button id="addVideoBtn">Add Video</button>
+        </div>
+    </div>
+
+    <!-- Room Management Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Room Management</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="room-section">
+                    <h3>Create New Room</h3>
+                    <button id="createRoomBtn" class="room-action-btn">Create Room</button>
+                    <p class="room-help">Creates a new private room with a shareable code</p>
+                </div>
+
+                <div class="room-section">
+                    <h3>Join Room</h3>
+                    <div class="join-room-container">
+                        <input type="text" id="joinRoomInput" placeholder="Enter room code (e.g., ABC123)" maxlength="6">
+                        <button id="joinRoomBtn" class="room-action-btn">Join</button>
+                    </div>
+                    <p class="room-help">Enter a 6-character room code to join</p>
+                </div>
+
+                <div class="room-section">
+                    <h3>Current Room</h3>
+                    <div class="current-room-info">
+                        <p><strong>Room Code:</strong> <span id="modalCurrentRoom">default</span></p>
+                        <button id="shareRoomBtn" class="room-action-btn secondary">Copy Share Link</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
