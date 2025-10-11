@@ -118,8 +118,10 @@ io.on('connection', (socket) => {
                     id: Date.now() + Math.random() // Simple unique ID
                 };
 
-                // Check if video already exists in history
-                const existingIndex = room.playlistHistory.findIndex(item => item.videoId === videoId);
+                // Check if video already exists in history (case-insensitive)
+                const existingIndex = room.playlistHistory.findIndex(
+                    item => item.videoId.toLowerCase() === videoId.toLowerCase()
+                );
                 if (existingIndex === -1) {
                     // Add to beginning of history
                     room.playlistHistory.unshift(historyItem);
@@ -158,20 +160,65 @@ io.on('connection', (socket) => {
         }
     });
 
+    // WebRTC signaling events for webcam support
+    socket.on('webrtc-offer', (data) => {
+        // Forward offer to specific peer
+        socket.to(data.to).emit('webrtc-offer', {
+            from: socket.id,
+            offer: data.offer
+        });
+    });
+
+    socket.on('webrtc-answer', (data) => {
+        // Forward answer to specific peer
+        socket.to(data.to).emit('webrtc-answer', {
+            from: socket.id,
+            answer: data.answer
+        });
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        // Forward ICE candidate to specific peer
+        socket.to(data.to).emit('webrtc-ice-candidate', {
+            from: socket.id,
+            candidate: data.candidate
+        });
+    });
+
+    socket.on('webcam-status', (enabled) => {
+        // Broadcast webcam status to room
+        socket.to(socket.roomId).emit('peer-webcam-status', {
+            peerId: socket.id,
+            enabled: enabled
+        });
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
 
+        // Notify room that this peer disconnected (for webcam cleanup)
         if (socket.roomId) {
-            const room = getRoom(socket.roomId);
-            room.connectedUsers--;
+            socket.to(socket.roomId).emit('peer-disconnected', socket.id);
 
-            // Send updated user count to remaining room clients
-            io.to(socket.roomId).emit('user-count', room.connectedUsers);
+            const room = rooms.get(socket.roomId);
+            if (room) {
+                // Prevent negative user count
+                room.connectedUsers = Math.max(0, room.connectedUsers - 1);
 
-            // Clean up empty rooms (except default)
-            if (room.connectedUsers === 0 && socket.roomId !== 'default') {
-                rooms.delete(socket.roomId);
-                console.log(`Room ${socket.roomId} deleted (empty)`);
+                // Send updated user count to remaining room clients
+                io.to(socket.roomId).emit('user-count', room.connectedUsers);
+
+                // Clean up empty rooms (except default) with delay to prevent race conditions
+                if (room.connectedUsers === 0 && socket.roomId !== 'default') {
+                    const roomIdToCleanup = socket.roomId;
+                    setTimeout(() => {
+                        const roomCheck = rooms.get(roomIdToCleanup);
+                        if (roomCheck && roomCheck.connectedUsers === 0) {
+                            rooms.delete(roomIdToCleanup);
+                            console.log(`Room ${roomIdToCleanup} deleted (empty)`);
+                        }
+                    }, 5000);
+                }
             }
         }
     });

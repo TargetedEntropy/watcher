@@ -7,6 +7,7 @@ A real-time web application that allows multiple users to watch YouTube videos t
 - **2x2 Video Grid**: Display up to 4 YouTube videos simultaneously
 - **Multi-Room Support**: Create private rooms with shareable codes or join the default public room
 - **Real-time Synchronization**: All users in the same room see identical videos instantly
+- **Webcam Support**: Peer-to-peer video chat in non-default rooms using WebRTC
 - **Playlist History**: Automatically tracks all videos added to the room (up to 50)
 - **Drag & Drop**: Drag videos from history panel directly onto any video slot
 - **Live User Count**: See how many people are watching in your room
@@ -68,6 +69,16 @@ http://localhost:3000
    - Hover over any video slot
    - Click the "Remove" button that appears
 
+7. **Using Webcam (Non-Default Rooms Only)**:
+   - Create or join a room (not the default room)
+   - A webcam panel will appear in the bottom-left corner
+   - Click "Enable Webcam" to start your video feed
+   - Other users in the room will see your webcam if they also have theirs enabled
+   - Your webcam preview appears at the top of the feed list
+   - Peer webcams appear below yours
+   - Click "Disable Webcam" to turn it off
+   - **Note**: Webcam requires browser permission for camera/microphone access
+
 ## How It Works
 
 The application uses WebSocket connections (via Socket.io) to maintain synchronized state across all connected clients. When any user adds or removes a video, the change is instantly broadcast to all other users in the same room.
@@ -77,6 +88,14 @@ The application uses WebSocket connections (via Socket.io) to maintain synchroni
 - Room codes are 6-character alphanumeric identifiers (e.g., ABC123)
 - Empty rooms are automatically cleaned up (except the default room)
 - Rooms persist as long as at least one user is connected
+
+### WebRTC Webcam System
+- Uses WebRTC for peer-to-peer video/audio streaming (no media server needed)
+- Socket.io handles WebRTC signaling (offer/answer/ICE candidate exchange)
+- STUN servers help establish direct connections through NAT/firewalls
+- Webcam feature is disabled in the default room for privacy
+- Connections automatically close when leaving a room or disconnecting
+- Optimized for low bandwidth with 320x240 video resolution
 
 ### Supported YouTube URL Formats
 
@@ -123,6 +142,13 @@ Works on all modern browsers that support:
 - YouTube iframe embeds
 - CSS Grid layout
 - Drag and Drop API
+- WebRTC (for webcam feature)
+- getUserMedia API (for webcam feature)
+
+**Note:** Webcam functionality requires:
+- HTTPS in production (browser security requirement)
+- Camera and microphone permissions
+- Modern browser with WebRTC support (Chrome, Firefox, Safari, Edge)
 
 ## Notes
 
@@ -131,6 +157,9 @@ Works on all modern browsers that support:
 - Playlist history limited to 50 most recent videos per room
 - All users in the same room share the same video grid and history
 - Drag and drop works from history panel to any video slot
+- Webcam is only available in non-default rooms (disabled in the default room for privacy)
+- WebRTC connections are peer-to-peer (no media streaming through the server)
+- For production deployment, use HTTPS to enable webcam functionality
 
 ## License
 
