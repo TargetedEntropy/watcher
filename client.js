@@ -15,6 +15,11 @@ let playlistHistory = [];
 let isPanelExpanded = true;
 let currentRoom = 'default';
 
+// Chat state
+let chatMessages = [];
+let username = localStorage.getItem('chatUsername') || null;
+let activeTab = 'history'; // 'history' or 'chat'
+
 // WebRTC state
 let localStream = null;
 let webcamEnabled = false;
@@ -177,6 +182,161 @@ async function addVideo(videoId = null, targetSlot = null, fromHistory = false) 
 // Remove video from grid
 function removeVideo(slotIndex) {
     socket.emit('remove-video', slotIndex);
+}
+
+// ===== Chat Functions =====
+
+// Switch between History and Chat tabs
+function switchTab(tab) {
+    activeTab = tab;
+
+    const historyTab = document.getElementById('historyTab');
+    const chatTab = document.getElementById('chatTab');
+    const historyContent = document.getElementById('playlistHistory');
+    const chatContent = document.getElementById('chatContent');
+
+    if (tab === 'history') {
+        historyTab?.classList.add('active');
+        chatTab?.classList.remove('active');
+        historyContent?.classList.add('active');
+        chatContent?.classList.remove('active');
+    } else {
+        historyTab?.classList.remove('active');
+        chatTab?.classList.add('active');
+        historyContent?.classList.remove('active');
+        chatContent?.classList.add('active');
+    }
+}
+
+// Send chat message
+function sendMessage() {
+    const chatInput = document.getElementById('chatInput');
+    const message = chatInput?.value.trim();
+
+    if (!message) return;
+
+    // Prompt for username if not set
+    if (!username) {
+        promptForUsername(() => {
+            sendMessageWithUsername(message);
+            chatInput.value = '';
+        });
+        return;
+    }
+
+    sendMessageWithUsername(message);
+    chatInput.value = '';
+}
+
+// Send message with username
+function sendMessageWithUsername(message) {
+    socket.emit('send-message', {
+        message: message,
+        timestamp: new Date().toISOString()
+    });
+}
+
+// Prompt user for username
+function promptForUsername(callback) {
+    const modal = document.getElementById('usernameModal');
+    const input = document.getElementById('usernameInput');
+    const saveBtn = document.getElementById('saveUsernameBtn');
+    const cancelBtn = document.getElementById('cancelUsernameBtn');
+
+    if (!modal || !input || !saveBtn) return;
+
+    modal.style.display = 'block';
+    input.value = '';
+    input.focus();
+
+    const handleSave = () => {
+        const newUsername = input.value.trim();
+        if (newUsername) {
+            username = newUsername;
+            localStorage.setItem('chatUsername', username);
+            socket.emit('set-username', username);
+            modal.style.display = 'none';
+            if (callback) callback();
+        }
+    };
+
+    const handleCancel = () => {
+        modal.style.display = 'none';
+    };
+
+    // Remove old listeners to prevent duplicates
+    const newSaveBtn = saveBtn.cloneNode(true);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+    newSaveBtn.addEventListener('click', handleSave);
+    newCancelBtn.addEventListener('click', handleCancel);
+
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleSave();
+        }
+    });
+}
+
+// Change username
+function changeUsername() {
+    promptForUsername(() => {
+        alert(`Username changed to: ${username}`);
+    });
+}
+
+// Render chat messages
+function renderChatMessages() {
+    const chatMessagesContainer = document.getElementById('chatMessages');
+    if (!chatMessagesContainer) return;
+
+    chatMessagesContainer.innerHTML = '';
+
+    if (chatMessages.length === 0) {
+        chatMessagesContainer.innerHTML = '<div class="empty-chat">No messages yet. Be the first to chat!</div>';
+        return;
+    }
+
+    chatMessages.forEach(msg => {
+        const messageDiv = document.createElement('div');
+
+        if (msg.type === 'system') {
+            messageDiv.className = 'chat-message system-message';
+            messageDiv.textContent = msg.message;
+        } else {
+            const isOwnMessage = msg.socketId === socket.id;
+            messageDiv.className = `chat-message ${isOwnMessage ? 'own-message' : 'other-message'}`;
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+
+            const usernameSpan = document.createElement('span');
+            usernameSpan.className = 'message-username';
+            usernameSpan.textContent = msg.username;
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'message-time';
+            const date = new Date(msg.timestamp);
+            timeSpan.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            header.appendChild(usernameSpan);
+            header.appendChild(timeSpan);
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.textContent = msg.message;
+
+            messageDiv.appendChild(header);
+            messageDiv.appendChild(content);
+        }
+
+        chatMessagesContainer.appendChild(messageDiv);
+    });
+
+    // Auto-scroll to bottom
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
 }
 
 // ===== WebRTC Functions =====
@@ -412,6 +572,11 @@ socket.on('connect', () => {
     statusIndicator.classList.remove('disconnected');
     statusText.textContent = 'Connected';
 
+    // Send username to server if set
+    if (username) {
+        socket.emit('set-username', username);
+    }
+
     // Join room from URL or default
     const urlParams = new URLSearchParams(window.location.search);
     const roomId = urlParams.get('room') || 'default';
@@ -510,6 +675,27 @@ socket.on('peer-disconnected', (peerId) => {
     closePeerConnection(peerId);
 });
 
+// Chat event handlers
+socket.on('chat-history', (history) => {
+    chatMessages = history;
+    renderChatMessages();
+});
+
+socket.on('receive-message', (message) => {
+    chatMessages.push(message);
+    renderChatMessages();
+});
+
+socket.on('user-joined-chat', (message) => {
+    chatMessages.push(message);
+    renderChatMessages();
+});
+
+socket.on('user-left-chat', (message) => {
+    chatMessages.push(message);
+    renderChatMessages();
+});
+
 // Event listeners
 addVideoBtn.addEventListener('click', () => addVideo());
 
@@ -521,7 +707,7 @@ urlInput.addEventListener('keypress', (e) => {
 
 // Render playlist history
 function renderPlaylistHistory() {
-    const historyContainer = document.getElementById('playlistHistory');
+    const historyContainer = document.getElementById('playlistHistoryList');
     if (!historyContainer) return;
 
     historyContainer.innerHTML = '';
@@ -693,20 +879,38 @@ socket.on('user-count', (count) => {
 
 // Room management functions
 function joinRoom(roomId) {
+    // Clear chat messages when switching rooms
+    chatMessages = [];
+    renderChatMessages();
+
     socket.emit('join-room', roomId, (response) => {
         if (response.success) {
             currentRoom = response.roomId;
             updateRoomDisplay();
+
+            // Send username to server if set
+            if (username) {
+                socket.emit('set-username', username);
+            }
         }
     });
 }
 
 function createRoom() {
+    // Clear chat messages when creating new room
+    chatMessages = [];
+    renderChatMessages();
+
     socket.emit('create-room', (response) => {
         if (response.success) {
             currentRoom = response.roomId;
             updateRoomDisplay();
             updateURL();
+
+            // Send username to server if set
+            if (username) {
+                socket.emit('set-username', username);
+            }
         }
     });
 }

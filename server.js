@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3000;
 // Store rooms data - each room has its own state
 let rooms = new Map();
 const MAX_HISTORY_SIZE = 50;
+const MAX_CHAT_HISTORY = 100;
 
 // Default room configuration
 function createRoom(roomId) {
@@ -24,6 +25,7 @@ function createRoom(roomId) {
         id: roomId,
         videoSlots: [null, null, null, null],
         playlistHistory: [],
+        chatHistory: [],
         connectedUsers: 0,
         createdAt: new Date().toISOString()
     };
@@ -63,7 +65,21 @@ io.on('connection', (socket) => {
         socket.emit('room-created', { roomId });
         socket.emit('initial-state', room.videoSlots);
         socket.emit('playlist-history', room.playlistHistory);
+        socket.emit('chat-history', room.chatHistory);
         io.to(roomId).emit('user-count', room.connectedUsers);
+
+        // Add system message for user join
+        const joinMessage = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            message: `${socket.username || 'User ' + socket.id.substring(0, 6)} joined the room`,
+            timestamp: new Date().toISOString()
+        };
+        room.chatHistory.push(joinMessage);
+        if (room.chatHistory.length > MAX_CHAT_HISTORY) {
+            room.chatHistory = room.chatHistory.slice(-MAX_CHAT_HISTORY);
+        }
+        io.to(roomId).emit('user-joined-chat', joinMessage);
 
         if (callback) callback({ success: true, roomId });
     });
@@ -83,7 +99,21 @@ io.on('connection', (socket) => {
         socket.emit('room-joined', { roomId });
         socket.emit('initial-state', room.videoSlots);
         socket.emit('playlist-history', room.playlistHistory);
+        socket.emit('chat-history', room.chatHistory);
         io.to(roomId).emit('user-count', room.connectedUsers);
+
+        // Add system message for user join
+        const joinMessage = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            message: `${socket.username || 'User ' + socket.id.substring(0, 6)} joined the room`,
+            timestamp: new Date().toISOString()
+        };
+        room.chatHistory.push(joinMessage);
+        if (room.chatHistory.length > MAX_CHAT_HISTORY) {
+            room.chatHistory = room.chatHistory.slice(-MAX_CHAT_HISTORY);
+        }
+        io.to(roomId).emit('user-joined-chat', joinMessage);
 
         if (callback) callback({ success: true, roomId });
     });
@@ -98,7 +128,21 @@ io.on('connection', (socket) => {
         socket.emit('room-joined', { roomId: 'default' });
         socket.emit('initial-state', defaultRoom.videoSlots);
         socket.emit('playlist-history', defaultRoom.playlistHistory);
+        socket.emit('chat-history', defaultRoom.chatHistory);
         io.to('default').emit('user-count', defaultRoom.connectedUsers);
+
+        // Add system message for user join
+        const joinMessage = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            message: `${socket.username || 'User ' + socket.id.substring(0, 6)} joined the room`,
+            timestamp: new Date().toISOString()
+        };
+        defaultRoom.chatHistory.push(joinMessage);
+        if (defaultRoom.chatHistory.length > MAX_CHAT_HISTORY) {
+            defaultRoom.chatHistory = defaultRoom.chatHistory.slice(-MAX_CHAT_HISTORY);
+        }
+        io.to('default').emit('user-joined-chat', joinMessage);
     }
     
     // Handle video addition
@@ -193,6 +237,45 @@ io.on('connection', (socket) => {
         });
     });
 
+    // Handle username setting
+    socket.on('set-username', (username) => {
+        if (username && username.trim()) {
+            socket.username = username.trim();
+            console.log(`User ${socket.id} set username to: ${socket.username}`);
+        }
+    });
+
+    // Handle chat messages
+    socket.on('send-message', (data) => {
+        const room = getRoom(socket.roomId);
+
+        if (!room || !data.message || !data.message.trim()) {
+            return;
+        }
+
+        const messageObject = {
+            id: Date.now() + Math.random(),
+            type: 'user',
+            message: data.message.trim(),
+            timestamp: new Date().toISOString(),
+            username: socket.username || `User ${socket.id.substring(0, 6)}`,
+            socketId: socket.id
+        };
+
+        // Add to room's chat history
+        room.chatHistory.push(messageObject);
+
+        // Limit chat history size (FIFO)
+        if (room.chatHistory.length > MAX_CHAT_HISTORY) {
+            room.chatHistory = room.chatHistory.slice(-MAX_CHAT_HISTORY);
+        }
+
+        // Broadcast to all users in the room
+        io.to(socket.roomId).emit('receive-message', messageObject);
+
+        console.log(`Message in room ${socket.roomId} from ${messageObject.username}: ${data.message.substring(0, 50)}`);
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
 
@@ -202,6 +285,19 @@ io.on('connection', (socket) => {
 
             const room = rooms.get(socket.roomId);
             if (room) {
+                // Add system message for user leave
+                const leaveMessage = {
+                    id: Date.now() + Math.random(),
+                    type: 'system',
+                    message: `${socket.username || 'User ' + socket.id.substring(0, 6)} left the room`,
+                    timestamp: new Date().toISOString()
+                };
+                room.chatHistory.push(leaveMessage);
+                if (room.chatHistory.length > MAX_CHAT_HISTORY) {
+                    room.chatHistory = room.chatHistory.slice(-MAX_CHAT_HISTORY);
+                }
+                io.to(socket.roomId).emit('user-left-chat', leaveMessage);
+
                 // Prevent negative user count
                 room.connectedUsers = Math.max(0, room.connectedUsers - 1);
 
