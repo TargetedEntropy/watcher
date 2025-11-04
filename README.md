@@ -7,7 +7,7 @@ A real-time web application that allows multiple users to watch YouTube videos t
 - **2x2 Video Grid**: Display up to 4 YouTube videos simultaneously
 - **Multi-Room Support**: Create private rooms with shareable codes or join the default public room
 - **Real-time Synchronization**: All users in the same room see identical videos instantly
-- **Webcam Support**: Peer-to-peer video chat in non-default rooms using WebRTC
+- **Webcam Support**: Peer-to-peer video chat using WebRTC
 - **Playlist History**: Automatically tracks all videos added to the room (up to 50)
 - **Drag & Drop**: Drag videos from history panel directly onto any video slot
 - **Live User Count**: See how many people are watching in your room
@@ -69,8 +69,7 @@ http://localhost:3000
    - Hover over any video slot
    - Click the "Remove" button that appears
 
-7. **Using Webcam (Non-Default Rooms Only)**:
-   - Create or join a room (not the default room)
+7. **Using Webcam**:
    - A webcam panel will appear in the bottom-left corner
    - Click "Enable Webcam" to start your video feed
    - Other users in the room will see your webcam if they also have theirs enabled
@@ -93,7 +92,6 @@ The application uses WebSocket connections (via Socket.io) to maintain synchroni
 - Uses WebRTC for peer-to-peer video/audio streaming (no media server needed)
 - Socket.io handles WebRTC signaling (offer/answer/ICE candidate exchange)
 - STUN servers help establish direct connections through NAT/firewalls
-- Webcam feature is disabled in the default room for privacy
 - Connections automatically close when leaving a room or disconnecting
 - Optimized for low bandwidth with 320x240 video resolution
 
@@ -157,7 +155,6 @@ Works on all modern browsers that support:
 - Playlist history limited to 50 most recent videos per room
 - All users in the same room share the same video grid and history
 - Drag and drop works from history panel to any video slot
-- Webcam is only available in non-default rooms (disabled in the default room for privacy)
 - WebRTC connections are peer-to-peer (no media streaming through the server)
 - For production deployment, use HTTPS to enable webcam functionality
 

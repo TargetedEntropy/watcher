@@ -18,7 +18,7 @@ let currentRoom = 'default';
 // Chat state
 let chatMessages = [];
 let username = localStorage.getItem('chatUsername') || null;
-let activeTab = 'history'; // 'history' or 'chat'
+let activeTab = 'chat'; // 'history' or 'chat'
 
 // WebRTC state
 let localStream = null;

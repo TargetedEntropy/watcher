@@ -870,8 +870,8 @@
         <div class="playlist-panel">
             <div class="playlist-header">
                 <div class="panel-tabs">
-                    <button class="tab-btn active" id="historyTab" onclick="switchTab('history')">History</button>
-                    <button class="tab-btn" id="chatTab" onclick="switchTab('chat')">Chat</button>
+                    <button class="tab-btn" id="historyTab" onclick="switchTab('history')">History</button>
+                    <button class="tab-btn active" id="chatTab" onclick="switchTab('chat')">Chat</button>
                 </div>
                 <button class="toggle-panel" id="togglePanel">
                     <span class="toggle-icon">◀</span>
@@ -879,7 +879,7 @@
             </div>
 
             <!-- History Tab Content -->
-            <div class="playlist-content active" id="playlistHistory">
+            <div class="playlist-content" id="playlistHistory">
                 <div class="playlist-instructions">
                     <strong>Click</strong> to add to empty slot<br>
                     <strong>Drag & Drop</strong> onto any slot to replace the current video
@@ -890,7 +890,7 @@
             </div>
 
             <!-- Chat Tab Content -->
-            <div class="chat-content" id="chatContent">
+            <div class="chat-content active" id="chatContent">
                 <div class="chat-header-actions">
                     <button class="change-username-btn" onclick="changeUsername()">Change Username</button>
                 </div>
