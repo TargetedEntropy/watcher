@@ -659,14 +659,24 @@ socket.on('webrtc-ice-candidate', async (data) => {
 socket.on('peer-webcam-status', async (data) => {
     const { peerId, enabled } = data;
 
-    if (enabled && webcamEnabled) {
-        // Peer enabled webcam, create connection if we have webcam enabled
+    if (enabled) {
+        // Peer enabled webcam, create connection as initiator
         if (!peerConnections.has(peerId)) {
             await createPeerConnection(peerId, true);
         }
     } else if (!enabled) {
         // Peer disabled webcam, close connection
         closePeerConnection(peerId);
+    }
+});
+
+// Handle list of existing webcam users when enabling webcam
+socket.on('existing-webcam-users', async (peerIds) => {
+    // Create connections with all existing webcam users
+    for (const peerId of peerIds) {
+        if (!peerConnections.has(peerId)) {
+            await createPeerConnection(peerId, true);
+        }
     }
 });
 

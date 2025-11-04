@@ -27,6 +27,7 @@ function createRoom(roomId) {
         playlistHistory: [],
         chatHistory: [],
         connectedUsers: 0,
+        webcamUsers: new Set(), // Track users with webcam enabled
         createdAt: new Date().toISOString()
     };
 }
@@ -230,11 +231,31 @@ io.on('connection', (socket) => {
     });
 
     socket.on('webcam-status', (enabled) => {
-        // Broadcast webcam status to room
-        socket.to(socket.roomId).emit('peer-webcam-status', {
-            peerId: socket.id,
-            enabled: enabled
-        });
+        const room = getRoom(socket.roomId);
+
+        if (enabled) {
+            // Add user to webcam users set
+            room.webcamUsers.add(socket.id);
+
+            // Send list of existing webcam users to this user
+            const existingWebcamUsers = Array.from(room.webcamUsers).filter(id => id !== socket.id);
+            socket.emit('existing-webcam-users', existingWebcamUsers);
+
+            // Broadcast to others that this user enabled webcam
+            socket.to(socket.roomId).emit('peer-webcam-status', {
+                peerId: socket.id,
+                enabled: true
+            });
+        } else {
+            // Remove user from webcam users set
+            room.webcamUsers.delete(socket.id);
+
+            // Broadcast to others that this user disabled webcam
+            socket.to(socket.roomId).emit('peer-webcam-status', {
+                peerId: socket.id,
+                enabled: false
+            });
+        }
     });
 
     // Handle username setting
@@ -285,6 +306,9 @@ io.on('connection', (socket) => {
 
             const room = rooms.get(socket.roomId);
             if (room) {
+                // Remove from webcam users if present
+                room.webcamUsers.delete(socket.id);
+
                 // Add system message for user leave
                 const leaveMessage = {
                     id: Date.now() + Math.random(),
