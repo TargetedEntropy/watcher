@@ -402,17 +402,8 @@ function updateWebcamUI() {
 // Show/hide webcam panel based on room
 function updateWebcamPanelVisibility() {
     const webcamPanel = document.getElementById('webcamPanel');
-
-    if (currentRoom !== 'default') {
-        webcamPanel.classList.add('visible');
-    } else {
-        webcamPanel.classList.remove('visible');
-
-        // Disable webcam if enabled and switching to default room
-        if (webcamEnabled) {
-            disableWebcam();
-        }
-    }
+    // Webcam is now available in all rooms including default
+    webcamPanel.classList.add('visible');
 }
 
 // Socket event handlers
@@ -766,8 +757,8 @@ socket.on('room-joined', (data) => {
     updateRoomDisplay();
     updateURL();
 
-    // If webcam is enabled in new room (not default), notify others
-    if (webcamEnabled && currentRoom !== 'default') {
+    // If webcam is enabled in new room, notify others
+    if (webcamEnabled) {
         socket.emit('webcam-status', true);
     }
 });
